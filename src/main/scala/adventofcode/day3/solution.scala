@@ -19,22 +19,24 @@ val sample =
 @main def solution() = {
   val fileContents = readFile("day3_input.txt")
   // val fileContents = sample.split("\n")
-  val results = processLines(fileContents.toArray)
+  val results = processLines(fileContents.toVector)
   val result = results.map(_.sum).sum
   println(s"result $result expected: 530849")
+  result
 }
 
 @main def solutionPart2() = {
   val fileContents = readFile("day3_input.txt")
   // val fileContents = sample.split("\n")
-  val results = part2(fileContents.toArray)
+  val results = part2(fileContents.toVector)
   val result = results.map{ _.sum }.sum
   println(s"result $result expected: 84900879")
+  result
 }
 
-def processLines(lines: Array[String]): Array[List[Int]] = {
+def processLines(lines: Vector[String]): Vector[List[Int]] = {
   val symbols: Set[Char] = Set('!', '@', '#', '$', '%', '^', '&', '*', '-', '+', '=', '/')
-  val withIndex: Array[(String, Int)] = lines.zipWithIndex
+  val withIndex: Vector[(String, Int)] = lines.zipWithIndex
   
   val result = withIndex.map{
     case (line, lineIdx) =>
@@ -44,18 +46,20 @@ def processLines(lines: Array[String]): Array[List[Int]] = {
   
       line.zipWithIndex.foreach{ 
         case (cc, ccIdx) if cc.isDigit && !seenIndexes(ccIdx) =>
-         val leftChar = if(ccIdx > 0) line(ccIdx - 1) else defaultChar
-         val rightChar = if(ccIdx <= line.length - 2) line(ccIdx + 1) else defaultChar
-         val upChar = if(lineIdx > 0) lines(lineIdx - 1)(ccIdx) else defaultChar
-         val downChar = if(lineIdx <= lines.length - 2) lines(lineIdx + 1)(ccIdx) else defaultChar
 
-         val upLeftChar = if(ccIdx > 0 && lineIdx > 0) lines(lineIdx - 1)(ccIdx - 1) else defaultChar
-         val upRightChar = if(lineIdx > 0 && ccIdx <= line.length - 2) lines(lineIdx - 1)(ccIdx + 1) else defaultChar
-         val downLeftChar = if(ccIdx > 0 && lineIdx < lines.length - 2) lines(lineIdx + 1)(ccIdx - 1) else defaultChar
-         val downRightChar = if(lineIdx <= lines.length - 2 && ccIdx <= line.length - 2) lines(lineIdx + 1)(ccIdx + 1) else defaultChar
+         val adjacentChars = for {
+           dx <- -1 to 1
+           dy <- -1 to 1
+           newX = ccIdx + dx 
+           newY = lineIdx + dy
+         } yield {
+           if( (0 < newX && newX < line.length - 1) && (0 < newY && newY < lines.length - 1) )
+             lines(newY)(newX)
+           else defaultChar 
+         }
 
-         val adjacentChars = Array(leftChar, rightChar, upChar, downChar, upLeftChar, upRightChar, downLeftChar, downRightChar)
          val isAdjacent = adjacentChars.exists(symbols.contains)
+
          if (isAdjacent) {
            val wholeNum = getContinuousDigits(line, ccIdx)
            val usedIndexes = wholeNum.map(_._2).toList
@@ -70,51 +74,33 @@ def processLines(lines: Array[String]): Array[List[Int]] = {
   result.filter(_.nonEmpty)
 }
 
-def part2(lines: Array[String]): Array[List[Int]] = {
-  val withIndex: Array[(String, Int)] = lines.zipWithIndex
+def part2(lines: Vector[String]): Vector[Vector[Int]] = {
+  val withIndex: Vector[(String, Int)] = lines.zipWithIndex
+
   
   val result = withIndex.map{
     case (line, lineIdx) =>
       val ratios = collection.mutable.ListBuffer.empty[Int]
 
-      line.zipWithIndex.foreach{ 
+      line.zipWithIndex.toVector.foreach{
         case (cc, ccIdx) if cc == '*' =>
-         val leftNum = if(ccIdx > 0) {
-            getContinuousDigits(line, ccIdx - 1)
-           } else IndexedSeq()
-
-         val rightNum = if(ccIdx <= line.length - 2){
-           getContinuousDigits(line, ccIdx + 1)
-         } else IndexedSeq()
-
-         val upNum = if(lineIdx > 0) {
-            getContinuousDigits(lines(lineIdx - 1), ccIdx)
-         }  else IndexedSeq()
-
-         val downNum = if(lineIdx <= lines.length - 2){
-          getContinuousDigits(lines(lineIdx + 1), ccIdx)
-         } else IndexedSeq()
-
-         val upLeftNum = if(ccIdx > 0 && lineIdx > 0){
-             getContinuousDigits(lines(lineIdx - 1), ccIdx - 1)
-          } else IndexedSeq()
-
-         val upRightNum = if(lineIdx > 0 && ccIdx <= line.length - 2){
-           getContinuousDigits(lines(lineIdx - 1), ccIdx + 1)
-         } else scala.collection.IndexedSeq()
-
-         val downLeftNum = if(ccIdx > 0 && lineIdx <= lines.length - 2) {
-            getContinuousDigits(lines(lineIdx + 1), ccIdx - 1)
-         } else IndexedSeq()
-
-         val downRightNum = if(lineIdx <= lines.length - 2 && ccIdx <= line.length - 2){
-           getContinuousDigits(lines(lineIdx + 1), ccIdx + 1)
-         } else IndexedSeq()
   
          // 1. Get adjacent Nums
-         val adjacentNums = Array(leftNum, rightNum, upNum, downNum, upLeftNum, upRightNum, downLeftNum, downRightNum).filter(_.nonEmpty)
+         val adjacentNums = (for {
+           dx <- -1 to 1
+           dy <- -1 to 1
+           newX = ccIdx + dx
+           newY = lineIdx + dy
+         } yield {
+           if( (0 <= ccIdx && ccIdx <= line.length - 1) && (0 <= newY && newY <= lines.length - 1))
+             getContinuousDigits(lines(newY), newX)
+           else Vector()
+         }).filter(_.nonEmpty)
 
-         // 2. Get distinct
+         // 2. Get distinct - this solves the case of the digit right above/below the ccIdx being part of a number
+         // 3 2 1 <- This produces 2 duplicates (3 total)
+         //   *   <- we are here
+         // 4 5 6 <- This produces 2 duplicates (3 total)
          val uniqueAdjacentNums = adjacentNums.distinct
 
          // 3. Count == 2
@@ -122,27 +108,25 @@ def part2(lines: Array[String]): Array[List[Int]] = {
 
          if (isAdjacent) {
            val uniqueNums = uniqueAdjacentNums.collect{ case num =>
-              num.map(_._1).mkString.toInt
-             }
+               num.map(_._1).mkString.toInt
+           }
            ratios.addOne(uniqueNums.product)
         }
       case _ => ()
     }
-      ratios.toList
-
+      ratios.toVector
   }
-    result.filter(_.nonEmpty)
+  result.filter(_.nonEmpty)
 }
 
-def getContinuousDigits(line: String, idx: Int): IndexedSeq[(Char, Int)] = {
+def getContinuousDigits(line: String, idx: Int): Vector[(Char, Int)] = {
   val c = line(idx)
   if(c.isDigit) {
-    val withIndex = line.zipWithIndex
+    val withIndex = line.zipWithIndex.toVector
     val leftNums = withIndex.slice(0,idx).reverse.takeWhile(_._1.isDigit).reverse
     val rightNums = withIndex.slice(idx, line.length).takeWhile(_._1.isDigit)
     leftNums ++ rightNums
-  } else IndexedSeq()
+  } else Vector()
 }
 
 def readFile(file: String): Iterator[String] = Source.fromResource(file).getLines()
-

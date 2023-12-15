@@ -9,6 +9,7 @@ import scala.util.Using
   val fileContents = readFile(finalFile)
   val result = fileContents.map(findDigit).sum
   println(s"expected: 53855 actual: $result Correct? ${53855 == result}")
+  result
 }
 
 def findDigit(line: String): Int = {
